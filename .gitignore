@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+
+# Editor
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Lab artifacts
+code/lab2-context-rag/.chroma/
+code/lab3-mini-harness/progress.md
+code/lab3-mini-harness/fake_project/
+code/lab3-mini-harness/safe_notes.txt
+
+# Env
+.env
+.env.local
