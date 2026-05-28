@@ -28,8 +28,13 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+
       - name: Build VitePress site
         run: npm run build
+        env:
+          VITEPRESS_BASE: /prompt-context-harness-guide/
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3

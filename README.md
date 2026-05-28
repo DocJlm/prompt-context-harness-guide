@@ -21,7 +21,7 @@ This repository **is a VitePress site**. The README is just an entry point — p
 ### Option A · Run locally
 
 ```bash
-git clone https://github.com/your-name/prompt-context-harness-guide
+git clone https://github.com/DocJlm/prompt-context-harness-guide
 cd prompt-context-harness-guide
 npm install
 npm run dev     # opens http://localhost:5173/

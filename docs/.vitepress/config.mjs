@@ -4,7 +4,10 @@ import { defineConfig } from 'vitepress'
 // Site-wide constants
 // ---------------------------------------------------------------
 const SITE_TITLE = 'Prompt × Context × Harness'
-const REPO = 'https://github.com/your-name/prompt-context-harness-guide'
+const REPO = 'https://github.com/DocJlm/prompt-context-harness-guide'
+const RAW_BASE = process.env.VITEPRESS_BASE || '/'
+const BASE = RAW_BASE.endsWith('/') ? RAW_BASE : `${RAW_BASE}/`
+const withBase = (path) => `${BASE}${path.replace(/^\/+/, '')}`
 
 // ---------------------------------------------------------------
 // Sidebar definitions
@@ -140,6 +143,7 @@ function enSidebar() {
 // ---------------------------------------------------------------
 export default defineConfig({
   title: SITE_TITLE,
+  base: BASE,
   description:
     'A complete tutorial on the evolution from Prompt → Context → Harness Engineering, with hands-on labs and case studies of MagicCube/helixent and bytedance/deer-flow.',
   lang: 'zh-CN',
@@ -148,7 +152,7 @@ export default defineConfig({
   ignoreDeadLinks: true,
 
   head: [
-    ['link', { rel: 'icon', href: '/favicon.svg' }],
+    ['link', { rel: 'icon', href: withBase('/favicon.svg') }],
     ['meta', { name: 'theme-color', content: '#5b6cff' }],
     ['meta', { property: 'og:type', content: 'website' }],
     ['meta', { property: 'og:title', content: SITE_TITLE }],

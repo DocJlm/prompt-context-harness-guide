@@ -7,12 +7,12 @@ description: Entry point for the three Python labs
 
 Each chapter ships with a **self-contained Python lab**. Five demos per lab, minimal deps, well-commented.
 
-> All code lives under [`code/`](https://github.com/your-name/prompt-context-harness-guide/tree/main/code).
+> All code lives under [`code/`](https://github.com/DocJlm/prompt-context-harness-guide/tree/main/code).
 
 ## Setup
 
 ```bash
-git clone https://github.com/your-name/prompt-context-harness-guide
+git clone https://github.com/DocJlm/prompt-context-harness-guide
 cd prompt-context-harness-guide
 
 # Each lab has its own requirements

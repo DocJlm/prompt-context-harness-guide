@@ -7,12 +7,12 @@ description: 三个 Python 实验的入口
 
 教程的三章各配套一个**可独立运行的 Python 实验**。每个实验 5 个 demo，依赖最小、注释充分。
 
-> 全部代码在仓库 [`code/`](https://github.com/your-name/prompt-context-harness-guide/tree/main/code) 目录下。
+> 全部代码在仓库 [`code/`](https://github.com/DocJlm/prompt-context-harness-guide/tree/main/code) 目录下。
 
 ## 通用准备
 
 ```bash
-git clone https://github.com/your-name/prompt-context-harness-guide
+git clone https://github.com/DocJlm/prompt-context-harness-guide
 cd prompt-context-harness-guide
 
 # 每个 lab 独立 requirements，进各自目录安装

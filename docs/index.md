@@ -19,7 +19,7 @@ hero:
       link: /en/
     - theme: alt
       text: GitHub
-      link: https://github.com/your-name/prompt-context-harness-guide
+      link: https://github.com/DocJlm/prompt-context-harness-guide
 
 features:
   - icon: 🔵
