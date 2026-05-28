@@ -1,0 +1,19 @@
+[build]
+  command = "npm run build"
+  publish = "docs/.vitepress/dist"
+
+[build.environment]
+  NODE_VERSION = "20"
+
+# Optional language-based redirect for the root path
+[[redirects]]
+  from = "/"
+  to = "/zh-cn/"
+  status = 302
+  conditions = { Language = ["zh"] }
+
+[[redirects]]
+  from = "/"
+  to = "/en/"
+  status = 302
+  conditions = { Language = ["en"] }
