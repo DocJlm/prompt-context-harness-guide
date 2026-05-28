@@ -15,6 +15,11 @@ venv/
 .DS_Store
 Thumbs.db
 
+# VitePress build / cache
+node_modules/
+docs/.vitepress/dist/
+docs/.vitepress/cache/
+
 # Lab artifacts
 code/lab2-context-rag/.chroma/
 code/lab3-mini-harness/progress.md
