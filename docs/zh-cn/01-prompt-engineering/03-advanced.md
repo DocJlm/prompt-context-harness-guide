@@ -8,7 +8,25 @@ description: 用模型改进模型；Reasoning Effort、Eagerness、Persistence�
 > "Most folks know prompt engineering. But to get the most out of AI agents, you need context engineering."  
 > — Anthropic
 
+> "**Your prompts are code, your .md/.json files are state on disk.**"  
+> — [Peter Steinberger（OpenClaw 作者）, *Essential Reading for Agentic Engineers*, 2025-06-30](https://steipete.me/posts/2025/essential-reading)
+
 到 2025–2026 年，模型本身已经能写出比你好的 Prompt。所以**进阶提示工程的重心从"怎么写"转到了"怎么调"**——调推理深度、调主动性、调工具使用风格。
+
+## 〇、范式跃迁 · Karpathy 的 "Software 3.0"
+
+Karpathy 2025 年在 YC AI Startup School 演讲里给这个变化命了名：
+
+> "Imo fair to say that software is changing quite fundamentally again. **LLMs are a new kind of computer, and you program them *in English*. Hence I think they are well deserving of a major version upgrade in terms of … Software 3.0.**"  
+> — [Karpathy, *Software Is Changing (Again)*, YC AI 2025-06-17](https://www.youtube.com/watch?v=LCEmiRjPEtQ)
+
+并且：
+
+> "**The hottest new programming language is English.**"
+
+含义对本章工程：**写 Prompt = 写代码**。你应该用版本管理它、用 eval 测试它、用 PR review 它、用 changelog 追踪它。Peter Steinberger 那句"prompts 是代码、md/json 是磁盘上的状态"是同一意思的工程化版本。
+
+这也是为什么本章 §1.4 评估那么重要 —— 没有 eval 的 prompt，就是没有单元测试的代码。
 
 ## 一、Meta-prompting：让模型改进自己的 prompt
 
@@ -129,6 +147,19 @@ GPT-5 引入的另一个习惯：**调工具前，让模型先用一句话告诉
 - **降低幻觉**：让模型"先说后做"，强迫它先 plan。
 
 这是 Coding Agent（如 Claude Code、Cursor、Codex）的标配做法。
+
+::: tip 旁注 · Karpathy 命名 "Vibe Coding"
+2025 年 2 月 Karpathy 发了一条把 "vibe coding" 推进英文互联网词典的推文：
+
+> "There's a new kind of coding I call '**vibe coding**', where **you fully give in to the vibes**, embrace exponentials, and forget that the code even exists. It's possible because the LLMs (e.g. Cursor Composer w Sonnet) are getting too good. Also I just talk to Composer with SuperWhisper and I **barely even touch the keyboard**. …  
+> I 'Accept All' always, **I don't read the diffs anymore**. When I get error messages I just copy paste them in with no comment, usually that fixes it. …  
+> I'm building a project or webapp, but it's not really coding — **I just see stuff, say stuff, run stuff, and copy paste stuff, and it mostly works**."  
+> — [@karpathy, 2025-02-02](https://x.com/karpathy/status/1886192184808149383)
+
+注意：**这不是"提示词"，这是"全自然语言对模型说话 + 不读 diff"**。它需要的"prompt 工程"反而最少 —— Karpathy 强调"talk to Composer with SuperWhisper"，连键盘都不碰。
+
+**vibe coding 的边界**：Karpathy 也说这适合"周末项目 / 一次性原型"。生产代码仍然需要 §1.4 的 eval、§1.3 的 Persistence/Eagerness 控制。Peter Steinberger 把这套实践推向极致 —— 详见 §3.2 §8.2。
+:::
 
 ## 五、Persistence：让模型坚持完成任务
 

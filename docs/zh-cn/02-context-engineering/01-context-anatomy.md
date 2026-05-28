@@ -8,6 +8,22 @@ description: System / Tools / Examples / History 四件套；注意力预算
 > "Anthropic's overall guidance across different components of context (system prompts, tools, examples, message history, etc.) is to be **thoughtful and keep your context informative, yet tight**."  
 > — Anthropic, *Effective Context Engineering for AI Agents*
 
+## 思想源头 · Karpathy 命名"上下文工程"
+
+虽然 Anthropic 是把 "Context Engineering" 写进官方博客的第一家，但**这个词的真正传播者**是 Andrej Karpathy。2025 年 6 月 25 日他发推力推：
+
+> "**+1 for 'context engineering' over 'prompt engineering'**. People associate prompts with short task descriptions you'd give an LLM in your day-to-day use. When in every industrial-strength LLM app, **context engineering is the delicate art and science of filling the context window with just the right information for the next step**."  
+> — [@karpathy, 2025-06-25](https://x.com/karpathy/status/1937902205765607626)
+
+并在同一线程里加了一句关键注脚：
+
+> "Context engineering is just one small piece of an emerging **thick layer of non-trivial software** that coordinates individual LLM calls (and a lot more) into full LLM apps."
+
+后半句的"a thick layer of non-trivial software"，**就是第 3 章 Harness Engineering 的内容**。两者是一条连续光谱：
+
+- **Context Engineering** = 决定**每一步往窗口里塞什么**的策略
+- **Harness Engineering** = 实现这些策略的**外围工程**（循环、工具、调度、状态机）
+
 ## 一、四件套：System / Tools / Examples / History
 
 按 Anthropic 的官方分类，一个 Agent 的上下文由四类组件组成：

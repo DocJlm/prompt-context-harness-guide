@@ -166,6 +166,42 @@ LLM 决策 → Answer
 
 **结论**：单轮 QA 用传统 RAG；Agent / Coding 场景用 Just-in-Time（Claude Code、Cursor、Codex 都是这种）。
 
+## ⚡ 旁注 · 中国大厂的"百万级上下文"实战
+
+2025 年中国大厂在**长上下文 + RAG 协同**上有几个值得抓拍的工程突破：
+
+### 阿里通义 Qwen-Agent —— 用 RAG 把 8K 外推到 1M
+阿里通义实验室的 Qwen-Agent 框架（github.com/QwenLM/Qwen-Agent）演示了一个工程层的招：
+
+> "**Qwen-Agent 具备记忆上下文的能力**，能在对话中保持状态。"  
+> 通过 RAG **将文档分割成小块、保留最相关的部分**，把基座 8K 上下文外推到处理 **100 万 token 级文档**。  
+> — [阿里云开发者社区, 2024-10 首发](https://developer.aliyun.com/article/1647468)
+
+**含义**：基座窗口大小不是终点。**良好的 RAG + chunking 策略可以把窗口"虚拟放大" 100×**。这也是为什么 §2.2 这一章是 §2 的核心 —— 检索决定了你的窗口"有效大小"。
+
+### DeepSeek MLA —— 让 KV cache 变小 4–7×
+DeepSeek V3/R1 的 **MLA（Multi-head Latent Attention）** 把 KV cache 每 token 压到约 70KB：
+
+> "**DeepSeek-V3 的 KV 缓存大小每 token 仅需 70 KB，是传统方法的 1/7 到 1/4**。"  
+> — [陈巍：DeepSeek V3/R1 的架构与训练技术分析, 知乎](https://zhuanlan.zhihu.com/p/21208287743)
+
+含义：**模型架构层的优化和应用层的 context engineering 是相乘关系**。Harness 写得再好，基座模型 KV cache 大就是贵；MLA 把单 token KV 压小 4-7×，相当于免费扩了 4-7× 上下文。
+
+### 月之暗面 Kimi MoBA + DeepSeek NSA —— "工程上跑得动的超长上下文"
+2025 年同期，两家先后发了**稀疏注意力**论文：DeepSeek 的 NSA（梁文锋署名）、月之暗面的 MoBA（混合块注意力）。两者各自把长上下文推到 **128K – 1M**。
+
+### 美团 LongCat-Flash —— 零计算专家 + PID 控制
+更激进的做法来自美团：
+
+> "LongCat-Flash 在 H800 上达成了 **100 tokens/s** 的生成速度，在保持极致生成速度的同时，输出成本低至 **5 元/百万 Token**。"  
+> — [美团技术团队, 2025-09-01](https://tech.meituan.com/2025/09/01/longcat-flash-chat.html)
+
+560B 总参 / 平均 27B 激活的 MoE，引入"零计算专家 + PID 控制器"动态调整激活量。**这是基座层为 Agent 优化的标志**：2025 之前的模型都是为聊天而优化，2025 年开始有为 Agent（长上下文 + 高 QPS + 工具调用密集）原生设计的基座模型。
+
+::: warning 工程师视角
+这些数字告诉你：**当你设计 Agent 上下文流时，model 的选择本身就是 context engineering 的一部分**。同样的 RAG/Compaction 策略，跑在 Qwen / DeepSeek / Kimi / LongCat 上的成本和延迟可能差 5×。选错基座，写多好的 prompt 都救不回来。
+:::
+
 ## 八、检索失败的常见原因
 
 按出现频率排序，**这是你 80% 的 RAG bug 出处**：

@@ -7,6 +7,36 @@ description: 工具循环、权限、沙箱、钩子、Session
 
 > "An agent harness is everything between the language model and the real world. **The model generates text. The harness decides what that text can touch.**"
 
+## 思想源头 · Karpathy 的 LLM OS
+
+讨论"Harness 是什么"之前，先回到这个范式的思想原点。2023 年 9 月，Andrej Karpathy 在 X 上发了那条被反复引用的"LLM OS"推文：
+
+> "With many 🧩 dropping recently, a more complete picture is emerging of LLMs not as a chatbot, but the **kernel process of a new Operating System**. E.g. today it orchestrates: Input & Output across modalities (text, audio, vision); Code interpreter, ability to write & run programs; Browser / internet access; Embeddings database for files and internal memory storage & retrieval. … TLDR looking at LLMs as chatbots is the same as looking at early computers as calculators. We're seeing an emergence of a whole new computing paradigm, and it is very early."  
+> — [@karpathy, 2023-09-28](https://x.com/karpathy/status/1707437820045062561)
+
+两个月后他给了"规格表"：
+
+> "LLM OS. Bear with me I'm still cooking. Specs:  
+> **LLM**: OpenAI GPT-4 Turbo 256 core (batch size) processor @ 20Hz (tok/s);  
+> **RAM**: 128Ktok;  
+> **Filesystem**: Ada002"  
+> — [@karpathy, 2023-11-11](https://x.com/karpathy/status/1723140519554105733)
+
+2025 年 6 月在 YC AI Startup School 演讲里他把这个类比正式化：
+
+> "LLMs have very strong analogies to operating systems. … **LLM is a new kind of computer. It's kind of like a CPU equivalent.** The context windows are kind of like the memory. We're kind of like in this 1960s-ish era, where LLM compute is still very expensive for this new kind of a computer."  
+> — Karpathy, *Software Is Changing (Again)*, [YC AI Startup School 2025-06-17](https://www.youtube.com/watch?v=LCEmiRjPEtQ)
+
+**这就是 Harness Engineering 的思想原点**。Karpathy 没有用"harness"这个词，但他给出了等价的图：
+
+- **LLM = CPU** —— 接受输入、产出输出
+- **Context Window = RAM** —— 有限的"工作记忆"
+- **嵌入数据库 = 文件系统** —— 长期持久存储
+- **代码解释器 / 浏览器 = 外设** —— 系统调用
+- **Harness = OS 内核** —— 调度、内存管理、I/O、权限
+
+带着这张图回看下面的"工具循环",会发现每一块代码都对应 OS 里的一个经典子系统。
+
 ## 一、最小 Harness：工具循环（Tool Loop）
 
 ```python
@@ -28,6 +58,13 @@ def run(user_input):
 2. Harness 拦下 `tool_call`，调用真实代码。
 3. 真实结果回填到 messages。
 4. 模型基于新结果继续。
+
+Karpathy 在 2025 年底的 *Year in Review* 博文里把这个循环称作"第一次令人信服的 LLM Agent 演示"：
+
+> "**Claude Code (CC) emerged as the first convincing demonstration of what an LLM Agent looks like** — something that in a loopy way strings together tool use and reasoning. … it's not just a website you go to like Google, it's a little spirit/ghost that 'lives' on your computer."  
+> — [Karpathy, 2025 LLM Year in Review (bearblog)](https://karpathy.bearblog.dev/year-in-review-2025/)
+
+注意"a little spirit/ghost that 'lives' on your computer" —— 这和 §3.0 章我们把 Harness 类比成"Agent 的 OS"是同一直觉。**Agent 不是网页里的对话，是住在你电脑里的程序**。
 
 所有 Agent 都是这个循环的变种。复杂的差异是：**多少工具、谁能调、调坏了怎么办、循环要不要拆 sub-agent、多 Session 怎么续……**
 

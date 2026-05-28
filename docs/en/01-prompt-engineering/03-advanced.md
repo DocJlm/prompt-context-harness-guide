@@ -8,16 +8,34 @@ description: Using the model to improve the model; Reasoning Effort, Eagerness, 
 > "Most folks know prompt engineering. But to get the most out of AI agents, you need context engineering."  
 > — Anthropic
 
-By 2025–2026, models themselves can write better prompts than you can. So **the center of gravity of advanced prompt engineering has shifted from "how to write" to "how to tune"**—tuning reasoning depth, tuning proactivity, tuning tool-use style.
+> "**Your prompts are code, your .md/.json files are state on disk.**"  
+> — [Peter Steinberger (author of OpenClaw), *Essential Reading for Agentic Engineers*, 2025-06-30](https://steipete.me/posts/2025/essential-reading)
 
-## 1. Meta-prompting: Letting the Model Improve Its Own Prompt
+By 2025–2026, the models themselves can write better prompts than you can. So **the center of advanced prompt engineering has shifted from "how to write" to "how to tune"** — tuning reasoning depth, tuning initiative, tuning tool-use style.
 
-OpenAI's GPT-5 Prompting Guide states it plainly: **GPT-5 is a metaprompting expert**.
+## 0. Paradigm Shift · Karpathy's "Software 3.0"
+
+At YC AI Startup School 2025, Karpathy gave the shift a name:
+
+> "Imo fair to say that software is changing quite fundamentally again. **LLMs are a new kind of computer, and you program them *in English*. Hence I think they are well deserving of a major version upgrade in terms of … Software 3.0.**"  
+> — [Karpathy, *Software Is Changing (Again)*, YC AI 2025-06-17](https://www.youtube.com/watch?v=LCEmiRjPEtQ)
+
+And:
+
+> "**The hottest new programming language is English.**"
+
+What this means for the engineering in this chapter: **writing a prompt = writing code**. You should version-control it, test it with evals, review it via PRs, track it with a changelog. Peter Steinberger's line "prompts are code, your .md/.json files are state on disk" is the engineering-flavored version of the same idea.
+
+This is also why §1.4 on evaluation matters so much — **a prompt without an eval is code without unit tests**.
+
+## 1. Meta-prompting: Let the Model Improve Its Own Prompt
+
+OpenAI says it plainly in the GPT-5 Prompting Guide: **GPT-5 is a strong metaprompter**.
 
 The simplest metaprompt template:
 
 ```text
-I want you to help me **evaluate and improve** a prompt.
+I want you to **evaluate and improve** a prompt.
 
 Original prompt:
 """
@@ -28,29 +46,29 @@ It performs poorly on the following cases:
 Case 1: input X → expected Y → actual Z
 Case 2: ...
 
-Please output in the following structure:
-1. Diagnosis of failure causes (one per case)
-2. Suggestions for improvement
+Please output, in this structure:
+1. Diagnosis of failure (one per case)
+2. Suggested improvements
 3. The full rewritten prompt
 ```
 
-This metaprompt is itself a prompt—you can also ask the model how to improve it. **It's a recursive process.**
+This metaprompt is itself a prompt — you can also feed it back to the model and ask how to improve it. **It's recursive.**
 
-### Three Practical Uses of Meta-prompting
+### Three real-world uses of meta-prompting
 
-1. **Cold start**: when you don't know how to start a new prompt, have the model generate a first draft from a one-sentence requirement.
-2. **Diagnose**: when a current prompt is inaccurate, feed the bad cases to the model and have it diagnose.
-3. **Refactor**: have the model rewrite a long prompt to be more compact (**note**: tell it which parts must not be changed).
+1. **Cold start**: When you don't know how to begin a new prompt, ask the model to generate a first version from a one-line requirement.
+2. **Diagnose**: When you have a prompt that misfires, feed the bad cases to the model and let it diagnose.
+3. **Refactor**: Ask the model to compress a long prompt (**note**: tell it which parts must not change).
 
-### Pitfalls of Meta-prompting
+### Pitfalls of meta-prompting
 
-- ❌ Letting the model "improvise"—it'll add too much boilerplate. Instructions must be tight.
-- ❌ Changing too much at once—iterate on one dimension at a time (first fix accuracy, then length, then format).
-- ❌ Putting metaprompt output **straight into production**—it must be **Eval-gated** (see §1.4).
+- ❌ Letting the model "freestyle" — it will over-add boilerplate. Keep instructions tight.
+- ❌ Changing too much at once — iterate on one dimension at a time (fix accuracy first, then length, then format).
+- ❌ Shipping the metaprompt's output **directly** — it must be **eval-gated** (see §1.4).
 
 ## 2. Reasoning Effort: How Much Brainpower?
 
-Models like GPT-5, Claude 4.x, DeepSeek-R1, and Qwen3-Thinking all introduce a **reasoning budget** knob. OpenAI uses the `reasoning_effort` parameter; Anthropic uses a `thinking` block.
+GPT-5, Claude 4.x, DeepSeek-R1, Qwen3-Thinking and others have introduced a **reasoning budget** knob. OpenAI uses the `reasoning_effort` parameter; Anthropic uses a `thinking` block.
 
 ```python
 # OpenAI GPT-5 style
@@ -61,24 +79,24 @@ response = client.chat.completions.create(
 )
 ```
 
-| Effort | Use case | Cost |
+| Effort | Suited for | Cost |
 | :--- | :--- | :--- |
 | `minimal` | Single-step classification, extraction, translation | Near-instant |
-| `low` | Simple code, rule-based reasoning | Slightly slow |
+| `low` | Simple code, rule-based reasoning | Slightly slower |
 | `medium` | **Default.** Multi-step tasks | Moderate |
 | `high` | Complex math, long-document reasoning | Slow, expensive |
 
-::: OpenAI official guidance
+::: tip OpenAI's official guidance
 > "Scale `reasoning_effort` up for complex tasks, down for efficiency; default is medium."
 
-**Best practice**: run Eval at medium first, then decide whether to tune. **Don't default to high**—it makes simple tasks slow and expensive too.
+**Best practice**: Run your Eval at medium first, then decide whether to tune. **Don't default to high** — it will make simple tasks slow and expensive.
 :::
 
-## 3. Agentic Eagerness: Tuning "Proactivity"
+## 3. Agentic Eagerness: Tuning "Initiative"
 
-This is a new dimension introduced by GPT-5. In multi-step tasks, **how eagerly should the model explore / call tools**?
+This is a brand-new dimension introduced by GPT-5. In multi-step tasks, **how aggressively should the model explore / call tools**?
 
-### Prompt that reduces eagerness
+### Prompt to decrease eagerness
 
 ```
 "Bias strongly towards providing a correct answer as quickly as possible,
@@ -86,39 +104,52 @@ even if it might not be fully correct. Usually, this means an absolute
 maximum of 2 tool calls."
 ```
 
-### Prompt that increases eagerness
+### Prompt to increase eagerness
 
 ```
 "Never stop or hand back to the user when you encounter uncertainty —
 research or deduce the most reasonable approach and continue."
 ```
 
-::: key judgment
-- **Customer service / coding**: lean **eager**—don't keep saying "please provide more information."
-- **Finance / medical / delete operations**: lean **not eager**—better to ask than to act recklessly.
+::: tip Key judgment call
+- **Customer support / coding**: lean **eager** — don't keep stopping to ask "please provide more information."
+- **Finance / medicine / destructive operations**: lean **not eager** — better to ask than to act recklessly.
 :::
 
-## 4. Tool Preambles: "Say Something" Before Calling a Tool
+## 4. Tool Preambles: Say a Line Before Calling a Tool
 
-Another habit introduced by GPT-5: **before calling a tool, have the model tell the user "what I'm about to do" in one sentence**.
+Another habit introduced by GPT-5: **before each tool call, have the model say one line telling the user what it's about to do.**
 
 ```text
-Before each tool call, tell the user in one sentence what you're about to do.
+Before each tool call, tell the user in one short sentence what you are about to do.
 For example:
-"Let me first look at the file structure..."
-Then issue the ListFiles call.
+"Let me take a look at the file structure first…"
+Then make the ListFiles call.
 ```
 
 Why it matters:
-- **Users can follow along**: reduces "black box" anxiety.
-- **Interpretability**: the model's intent is visible in logs.
-- **Reduces hallucination**: making the model "speak before acting" forces it to plan first.
+- **The user can follow along** — reduces black-box anxiety.
+- **Interpretability** — the model's intent shows up in logs.
+- **Reduces hallucination** — by making the model "speak then act," you force it to plan first.
 
-This is standard practice for Coding Agents (such as Claude Code, Cursor, Codex).
+This is standard practice in coding agents (Claude Code, Cursor, Codex).
 
-## 5. Persistence: Make the Model Stick With the Task
+::: tip Side note · Karpathy names "Vibe Coding"
+In February 2025 Karpathy tweeted what put "vibe coding" into the English-internet dictionary:
 
-From OpenAI's official guidance, **almost all agentic scenarios should add this**:
+> "There's a new kind of coding I call '**vibe coding**', where **you fully give in to the vibes**, embrace exponentials, and forget that the code even exists. It's possible because the LLMs (e.g. Cursor Composer w Sonnet) are getting too good. Also I just talk to Composer with SuperWhisper and I **barely even touch the keyboard**. …  
+> I 'Accept All' always, **I don't read the diffs anymore**. When I get error messages I just copy paste them in with no comment, usually that fixes it. …  
+> I'm building a project or webapp, but it's not really coding — **I just see stuff, say stuff, run stuff, and copy paste stuff, and it mostly works**."  
+> — [@karpathy, 2025-02-02](https://x.com/karpathy/status/1886192184808149383)
+
+Notice: **this isn't "prompting" — this is "talk to the model in natural language + don't read the diffs."** The "prompt engineering" it requires is actually the least of all — Karpathy emphasizes "talk to Composer with SuperWhisper" and doesn't even touch the keyboard.
+
+**The boundary of vibe coding**: Karpathy himself notes this suits "weekend projects / throwaway prototypes." Production code still needs the §1.4 evals and the Persistence/Eagerness controls of §1.3. Peter Steinberger pushes this practice to its extreme — see §3.2 §8.2.
+:::
+
+## 5. Persistence: Make the Model Finish the Task
+
+This comes from OpenAI's official guidance, and **almost every agentic scenario needs it**:
 
 ```text
 You are an agent — please keep going until the user's query is completely
@@ -126,9 +157,9 @@ resolved, before ending your turn and yielding back to the user. Only
 terminate your turn when you are sure the problem is solved.
 ```
 
-It fixes a classic bug: **the model timidly stops midway**, leaving a half-finished job for you.
+This solves a classic bug: **the model "loses its nerve" partway and stops**, leaving a half-finished job on your hands.
 
-## 6. Advanced Output Format: Make the Model "Self-Check"
+## 6. Output Format, Advanced: Make the Model "Self-Check"
 
 Force the model to **self-check** at the end of its output:
 
@@ -144,44 +175,45 @@ Force the model to **self-check** at the end of its output:
 }
 ```
 
-This trick is astonishingly effective in production—**to fill in that self_check field, the model automatically goes back and reviews whether its answer meets the constraints**. You get a free layer of self-reflection.
+The effect of this trick in production is striking — **to fill in the `self_check` field, the model automatically revisits whether its answer meets the constraints**. You get a free layer of self-reflection.
 
-## 7. Adapting to Chinese Models: Differences
+## 7. Adaptation for Chinese Models
 
-Chinese-domestic models (Tongyi Qwen, Zhipu GLM, DeepSeek, Moonshot Kimi, Baichuan, Wenxin) mostly support OpenAI-compatible APIs, so the prompt templates above **can be reused almost verbatim**. But there are a few empirical differences:
+Chinese-domestic models (Tongyi Qwen, Zhipu GLM, DeepSeek, Moonshot Kimi, Baichuan, Wenxin) mostly support OpenAI-compatible APIs, so the prompt templates above are **almost directly reusable**. But there are a few notable differences:
 
-| Model family | Tendencies / notes |
+| Model family | Tendencies / things to watch |
 | :--- | :--- |
-| **Qwen** | More stable on Chinese prompts; XML tags + JSON Schema compatibility is good |
-| **GLM** | Prefers Markdown structure; trigger CoT with "请逐步思考" (please reason step by step) |
-| **DeepSeek-V/R series** | The R series has strong built-in CoT—**don't** add step-by-step on top |
-| **Kimi** | Excellent long-context, especially suited to very long RAG scenarios |
-| **Baichuan / Wenxin** | More "polite" Chinese word choice; prefers "expert" role framings |
+| **Qwen** | More stable on Chinese prompts; works well with XML tags + JSON Schema |
+| **GLM** | Prefers Markdown structure; CoT is triggered with "please reason step by step" |
+| **DeepSeek-V/R series** | The R series has strong built-in CoT — **do not** add step-by-step instructions |
+| **Kimi** | Excellent long context, especially suited to very long RAG |
+| **Baichuan / Wenxin** | Chinese phrasing is more "polite"; prefer "expert" role framings |
 
-::: general advice
-**Write and tune all prompts first on GPT-4o-mini or Claude Haiku, then** run an Eval on the Chinese models. Cross-model robustness is a core production value metric.
+::: tip General advice
+**Write and tune all prompts on GPT-4o-mini or Claude Haiku first; then** run an Eval on the Chinese models. Cross-model robustness is the core production metric.
 :::
 
-## 8. Combining Everything: One "GPT-5 Era Prompt"
+## 8. Putting It All Together: A "GPT-5 Era" Prompt
 
 ```text
-# Role and goal
-You are a senior SRE Agent, responsible for diagnosing production incidents.
+# Role & Goal
+You are a senior SRE Agent responsible for diagnosing production incidents.
 
 # Persistence
-Do not stop until the incident is localized + a fix plan is given.
+Do not stop until the incident is diagnosed AND a fix is proposed.
 
 # Eagerness
-Be eager about tool calls: better to inspect one more log than to miss something. Max 8 tool-call budget.
+Be eager about tool calls: better to read one more log line than to miss something.
+Maximum budget: 8 tool calls.
 
 # Tool Preamble
-Before each tool call, tell the on-call engineer in one sentence what you're about to do.
+Before each tool call, tell the ops engineer in one sentence what you are about to do.
 
 # Reasoning
-Use thinking for complex correlation analysis. Don't use thinking for trivial command concatenation.
+Use thinking for complex correlation analysis. Skip thinking for simple command stitching.
 
 # Output
-Final output in the following JSON:
+Final answer in this JSON:
 {
   "root_cause": "...",
   "evidence": ["...", "..."],
@@ -194,7 +226,7 @@ Final output in the following JSON:
 }
 ```
 
-This snippet simultaneously contains Role, Persistence, Eagerness, Preamble, Reasoning, Structured Output, and Self-check — **every move from earlier in this chapter is in here**.
+This single prompt simultaneously contains Role, Persistence, Eagerness, Preamble, Reasoning, Structured Output, and Self-check — **every trick from earlier in the chapter is in there**.
 
 ---
 

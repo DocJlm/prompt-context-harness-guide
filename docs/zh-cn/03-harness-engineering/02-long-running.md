@@ -18,6 +18,13 @@ description: Planner-Generator-Evaluator · progress.txt · Context Reset
 4. **Lost progress**：跑到一半挂掉，没存进度，下次完全从零开始。
 5. **One-shot illusion**：试图一次性把整个产品做完，结果做了一半发现整体方向错。
 
+Karpathy 在 Dwarkesh 播客上把这个问题刻画为 **"March of Nines"（9 的长征）**：
+
+> "What takes the long amount of time and the way to think about it is that it's a **march of nines**. Every single nine is a constant amount of work. … When you get a demo and something works **90%** of the time, that's just the first nine. Then you need the second nine, a third nine, a fourth nine, a fifth nine."  
+> — [Karpathy, Dwarkesh Podcast 2025-10-17](https://www.dwarkesh.com/p/andrej-karpathy)
+
+也就是说：**Demo 跑通 90% 只是第一个 9**。从这里到生产级的 99.999% 之间，每一个 9 都是等量的工程量。长跑型 Harness 工程的全部价值，就是把"再加一个 9"变得可重复。
+
 Anthropic 的解决方案，是 *Harness Design for Long-Running Applications* 这篇文章里的三大原则。
 
 ## 二、三大原则
@@ -267,7 +274,89 @@ def pick_next_action():
 
 这套架构 Anthropic 自己用 Sonnet 4.5 实测能**自动跑出能跑通端到端测试的 Web 应用**。
 
-## 八、把这一节装进脑子
+## 八、来自实战的声音
+
+理论讲完了。下面是**在生产里跑了几千小时的人**告诉你的真相。
+
+### 8.1 Manus —— "KV-Cache 命中率是单一最重要的指标"
+
+Manus 团队在 2025 年 7 月公开了他们做 Agent 框架的复盘（被腾讯云开发者社区中文转载），自嘲为 "随机梯度下降式" 工程 —— **重写了四次**。最深刻的两条规则：
+
+> "如果只能选择一个指标，我会认为 **KV-缓存命中率是生产阶段 AI 智能体最重要的单一指标**。"
+
+> "**任何更改都将使后续所有动作和观察结果的 KV-缓存失效。**"
+
+—— [《AI 智能体"上下文工程"实践：来自 Manus 项目的经验总结》, 腾讯云开发者社区, 2025-07-23](https://cloud.tencent.com/developer/article/2545989)
+
+这两条铁律给 Harness 设计带来两条直接约束：
+
+1. **系统 prompt 前缀必须绝对稳定**。任何动态注入都要放在末尾。
+2. **工具不要动态增删**。用 **logits mask 屏蔽** 不应被调用的工具，而不是从工具列表里删掉它 —— 删除会让所有后续 KV-cache 失效。
+
+Manus 还披露了一个反直觉的成本结构：**input:output ≈ 100:1**。也就是说一个长跑 Agent 的成本 99% 都在输入端。**缓存与未缓存的 token 价差通常是 10×**。这就解释了为什么 KV cache 命中率是核心指标。
+
+### 8.2 Peter Steinberger —— "终端宫格 = 我的 orchestrator"
+
+OpenClaw（前身 Clawd / Moltbot）的作者、前 PSPDFKit 创始人 Peter Steinberger，2025-2026 年间在博客和 Pragmatic Engineer 专访里分享了他**反共识**的长跑 Agent 工作流。这位"奥地利 vibe coder"不用任何高级 orchestrator，而是直接用**终端宫格**：
+
+> "Between 3-8 in parallel **in a 3x3 terminal grid**, most of them in the same folder. … Agents make **git atomic commits themselves**. **Don't be afraid of stopping models mid-way** — file changes are atomic."  
+> — [Steinberger, *Just Talk To It*, 2025-10-14](https://steipete.me/posts/just-talk-to-it)
+
+他给出了"长跑型 Agent 工程"的 Peter 派纲领（与 Anthropic 的官方版形成有意思的对照）：
+
+| 原则 | 出处 |
+| :--- | :--- |
+| **Prompts are code, your .md/.json files are state on disk.** | [Essential Reading for Agentic Engineers](https://steipete.me/posts/2025/essential-reading) |
+| **Atomic git commits by the agent itself, safe to kill mid-stream.** | [Just Talk To It](https://steipete.me/posts/just-talk-to-it) |
+| **Skip third-party harnesses; subscribe to the labs directly.** "4 OpenAI subs and 1 Anthropic sub." | [Just Talk To It](https://steipete.me/posts/just-talk-to-it) |
+| **Close the loop inside the agent** —— 让 Agent 自己 compile / lint / test / validate，本地测试胜过远程 CI。 | [Pragmatic Engineer interview](https://newsletter.pragmaticengineer.com/p/the-creator-of-clawd-i-ship-code) |
+| **YOLO 模式 + `--dangerously-skip-permissions`** 才是 inference 速度的唯一打开方式。 | [Pragmatic Engineer interview](https://newsletter.pragmaticengineer.com/p/the-creator-of-clawd-i-ship-code) |
+| **"I ship code I don't read."** | [Pragmatic Engineer interview](https://newsletter.pragmaticengineer.com/p/the-creator-of-clawd-i-ship-code) |
+
+注意 Peter 派与 Anthropic 派**至少有两个根本分歧**：
+
+| 维度 | Anthropic 派 | Peter 派 |
+| :--- | :--- | :--- |
+| Sub-agent 调度 | 用 `task` 工具显式 spawn | **不用 orchestrator**，纯靠终端宫格 |
+| 评估闭环 | 独立 Evaluator agent | 让 Generator 自己跑测试 |
+| 风险控制 | 严格 permission gate | YOLO + `--dangerously-skip-permissions` |
+
+哪个对？**两个都对，看你的项目** ——
+- **企业级、多用户、不可逆操作多**：Anthropic 派稳。
+- **单人项目、原子提交、迭代速度第一**：Peter 派快。
+
+Karpathy 在 Sequoia 演讲里给的中庸建议是 **"Keep AI on tight leash"** 与 **"Autonomy slider"**：
+
+> "There's what I call the **autonomous slider** … you can either just do a quick search, or you can do research, or you can do deep research."  
+> — Karpathy, Software Is Changing (Again), YC 2025-06
+
+**好的 Harness 不固定一个自主等级，而是给用户一根可调的滑杆**。
+
+### 8.3 阿里云 —— "Agent 应该灵活自主还是稳定可控？"
+
+阿里云算法专家姜剑（飞樰）在 InfoQ 文章里给出了同一个张力的企业落地版：
+
+> "Agent 到底应该是灵活自主还是稳定可控？其实这并不是非此即彼的状态，**取决于你的场景**。"  
+> — [《阿里云客服 Agent 业务提效实践》, InfoQ, 2025-07-04](https://www.infoq.cn/article/vxqmohtlz9oasln733rg)
+
+阿里把 Agent 拆为两类：
+- **"大模型自主规划"类**（如 RDS 异常诊断）—— 偏 Peter 派
+- **"Workflow 预编排"类**（如订单财务查询）—— 偏 Anthropic 派
+
+并配套**评测语料**（工具选择 / 动作执行 / 参数提取准确率）+ **AI 辅助提示词调优** 流程，降低业务侧 prompt 编写门槛。
+
+### 8.4 阿里云望宸 —— 上下文工程的"框架接管"趋势
+
+阿里云望宸在《浅谈 Agent 开发工具链演进历程》里给出了一个判断：
+
+> "**把原本开发者负责的 Agent 上下文工程，转移到了框架侧**，包括构建、执行和运行。"  
+> — [阿里云云原生, 2025-10-27](https://www.cnblogs.com/alisystemsoftware/p/19169571)
+
+他把工具链演进划分为四阶段：基础框架（LangChain/LlamaIndex）→ 协作 & 工具（Dify、MCP）→ 强化学习 → **模型中心化**（AgentKit、Claude Skills）。
+
+注意第四阶段：**Skills、AGENTS.md 这类约定让框架自身越来越薄、模型自己负责越来越多**。helixent 的 `~/.agents/skills/` 自动发现、deer-flow 的 `claude-to-deerflow` 互通 skill —— 都是这个趋势的具体落地。
+
+## 九、把这一节装进脑子
 
 写长跑 Harness 的不二法门：
 

@@ -7,7 +7,37 @@ description: Tool loop, permissions, sandbox, hooks, sessions
 
 > "An agent harness is everything between the language model and the real world. **The model generates text. The harness decides what that text can touch.**"
 
-## 1. The Minimal Harness: the Tool Loop
+## Origin of the Idea · Karpathy's LLM OS
+
+Before discussing "what is a Harness," let's return to the intellectual origin of the paradigm. In September 2023, Andrej Karpathy posted the now-famous "LLM OS" tweet on X:
+
+> "With many 🧩 dropping recently, a more complete picture is emerging of LLMs not as a chatbot, but the **kernel process of a new Operating System**. E.g. today it orchestrates: Input & Output across modalities (text, audio, vision); Code interpreter, ability to write & run programs; Browser / internet access; Embeddings database for files and internal memory storage & retrieval. … TLDR looking at LLMs as chatbots is the same as looking at early computers as calculators. We're seeing an emergence of a whole new computing paradigm, and it is very early."  
+> — [@karpathy, 2023-09-28](https://x.com/karpathy/status/1707437820045062561)
+
+Two months later he gave the "spec sheet":
+
+> "LLM OS. Bear with me I'm still cooking. Specs:  
+> **LLM**: OpenAI GPT-4 Turbo 256 core (batch size) processor @ 20Hz (tok/s);  
+> **RAM**: 128Ktok;  
+> **Filesystem**: Ada002"  
+> — [@karpathy, 2023-11-11](https://x.com/karpathy/status/1723140519554105733)
+
+At YC AI Startup School 2025 he formalized the analogy:
+
+> "LLMs have very strong analogies to operating systems. … **LLM is a new kind of computer. It's kind of like a CPU equivalent.** The context windows are kind of like the memory. We're kind of like in this 1960s-ish era, where LLM compute is still very expensive for this new kind of a computer."  
+> — Karpathy, *Software Is Changing (Again)*, [YC AI Startup School 2025-06-17](https://www.youtube.com/watch?v=LCEmiRjPEtQ)
+
+**This is the intellectual origin of Harness Engineering.** Karpathy didn't use the word "harness," but he gave us the equivalent picture:
+
+- **LLM = CPU** — accepts input, produces output
+- **Context Window = RAM** — bounded "working memory"
+- **Embeddings DB = Filesystem** — long-term persistent storage
+- **Code interpreter / browser = Peripherals** — system calls
+- **Harness = OS kernel** — scheduling, memory management, I/O, permissions
+
+Hold this picture in mind as you read about the "tool loop" below — each block of code corresponds to a classic OS subsystem.
+
+## 1. The Minimal Harness: A Tool Loop
 
 ```python
 def run(user_input):
@@ -15,50 +45,57 @@ def run(user_input):
     while True:
         resp = model.chat(messages, tools=TOOLS)
         if not resp.tool_calls:
-            return resp.content            # Model gives a final answer, exit the loop
+            return resp.content            # Model gave a final answer; exit loop
         for tc in resp.tool_calls:
             result = TOOLS[tc.name](**tc.args)
             messages.append(tool_result(tc.id, result))
-        messages.append(resp)              # Also append the assistant's tool_call
+        messages.append(resp)              # Also write assistant's tool_call back
 ```
 
-These 7 lines are **the soul of a Harness**:
+These 7 lines are the **soul of the Harness**:
 
-1. The model decides what to "think" and "do" next.
-2. The Harness intercepts the `tool_call` and invokes real code.
+1. The model decides "what to think" and "what to do" next.
+2. The harness intercepts `tool_call` and runs the real code.
 3. Real results are written back to messages.
 4. The model continues based on the new results.
 
-Every Agent is a variant of this loop. The complex differences are: **how many tools, who can call them, what to do when a call fails, whether to split the loop into sub-agents, how to resume across sessions...**
+In his late-2025 *Year in Review* blog, Karpathy called this loop "the first convincing demonstration of an LLM agent":
 
-## 2. Tools: the World the Agent Can "Reach Out and Touch"
+> "**Claude Code (CC) emerged as the first convincing demonstration of what an LLM Agent looks like** — something that in a loopy way strings together tool use and reasoning. … it's not just a website you go to like Google, it's a little spirit/ghost that 'lives' on your computer."  
+> — [Karpathy, 2025 LLM Year in Review (bearblog)](https://karpathy.bearblog.dev/year-in-review-2025/)
 
-**A model without tools can only write text.**
+Note "a little spirit/ghost that 'lives' on your computer" — this is the same intuition as the §3.0 analogy of the harness as an "agent OS." **The agent isn't a web-page conversation; it's a program that lives in your machine.**
+
+All agents are variants of this loop. The complex differences are: **how many tools, who can call what, what to do when things break, whether to split into sub-agents, how to continue across sessions, etc.**
+
+## 2. Tools: The World the Agent Can "Reach"
+
+**A model without tools can only write words.**
 
 | Category | Examples | Risk |
 | :--- | :--- | :--- |
-| **Read** | `read_file`, `list_files`, `search`, `web_fetch` | Near zero |
-| **Write** | `write_file`, `edit_file`, `mkdir` | May overwrite |
+| **Read** | `read_file`, `list_files`, `search`, `web_fetch` | Almost none |
+| **Write** | `write_file`, `edit_file`, `mkdir` | Possible misedits |
 | **Execute** | `bash`, `python_eval`, `npm_install` | High |
-| **Communication** | `send_email`, `post_slack`, `call_api` | Irreversible |
-| **Meta-tools** | `task` (sub-Agent), `memory_write`, `thinking` | — |
+| **Communicate** | `send_email`, `post_slack`, `call_api` | Irreversible |
+| **Meta-tools** | `task`(sub-agent), `memory_write`, `thinking` | — |
 
-Anthropic explicitly notes in the *Harness Engineering* article:
+Anthropic explicitly notes in their *Harness Engineering* article:
 
 > "Claude Code exposes roughly 19 permission-gated tools."
 
-These 19 tools are the whole "universe" of Claude Code. Understanding them = understanding the capability boundary of a Coding Agent.
+Those 19 tools are Claude Code's entire "universe." Understand them = you understand the capability boundaries of a coding agent.
 
-### Criteria for a "Good" Tool
+### Standards for a "Good" Tool
 
-A well-designed tool satisfies:
+A well-built tool should satisfy:
 
 ```
-1. Self-contained         One call returns a complete result, without needing another tool to prepare it
-2. Robust to error        Wrong args / missing resource → returns a **meaningful** error, never crashes the loop
-3. Token-efficient        Returns compact structured data, not a 50K-char dump
-4. Idempotent or marked   Can be repeated safely, or clearly labeled "irreversible"
-5. Clear naming & desc    The name + description tell the model exactly when to use it
+1. Self-contained         One call returns full result, no need to call another tool first
+2. Robust to error        Bad args / missing resource → return a meaningful error, not crash the loop
+3. Token-efficient        Return concise structured data, not a 50K-char dump
+4. Idempotent or marked   Repeatedly callable / clearly marked "irreversible"
+5. Clear naming & desc    Name + description make it obvious when to use
 ```
 
 Example:
@@ -87,30 +124,30 @@ Example:
   "description": "Execute something",
   "parameters": {"cmd": "string"}
 }
-# Is it bash or Python? No error contract; permissions can blow up
+# bash or python? no error contract; may blow permissions
 ```
 
-## 3. Permissions and Sandboxes
+## 3. Permissions and Sandbox
 
-How much a tool can actually do **depends on what permissions the Harness grants it**.
+The size of action a tool can take **depends on what permissions the harness grants it**.
 
-### Permission Tiers (borrowed from Claude Code)
+### Permission tiers (inspired by Claude Code)
 
 ```
 permission_mode:
-  - read_only        Agent can only read; writes/exec must ask each time
-  - acceptEdits      Allow file writes, but bash still asks
-  - autoApprove      All tools auto-allowed (only in controlled environments)
-  - plan             Plan-only, no real actions ("think before you speak" mode)
+  - read_only        Agent can only read; writes / executes ask every time
+  - acceptEdits      Allow file writes; bash still asks
+  - autoApprove      All tools auto-allowed (only for controlled environments)
+  - plan             Only planning allowed, no real action ("think before acting" mode)
 ```
 
-Before every tool call, the Harness checks:
+Before each tool call, the harness checks:
 
 ```python
 def execute_tool_call(tc):
     if not is_permitted(tc.name, tc.args, current_mode):
         if has_user():
-            user_response = ask_user(f"Allow call {tc.name}({tc.args})?")
+            user_response = ask_user(f"Allow call to {tc.name}({tc.args})?")
             if not user_response.approve:
                 return tool_result(tc.id, "user denied")
         else:
@@ -118,40 +155,40 @@ def execute_tool_call(tc):
     return tool_result(tc.id, TOOLS[tc.name](**tc.args))
 ```
 
-### Sandbox
+### Sandboxing
 
-Writing files / running bash always happens **inside a sandbox**:
+Writes / bash always run in a **sandbox**:
 
-| Sandbox form | Isolation strength | Example |
+| Sandbox form | Isolation strength | Examples |
 | :--- | :--- | :--- |
-| **Same process** | None | Direct `subprocess.run` |
-| **Same host, separate directory** | Low | `cd /tmp/agent-workdir && bash` |
-| **Same host, separate user** | Medium | `sudo -u agent_user bash` |
+| **Same process** | None | direct `subprocess.run` |
+| **Same host, different dir** | Low | `cd /tmp/agent-workdir && bash` |
+| **Same host, different user** | Medium | `sudo -u agent_user bash` |
 | **Container** | High | Docker / Firecracker |
 | **Remote VM** | Very high | Modal / E2B / Daytona |
 
-deer-flow provides two implementations: `AioSandboxProvider` (Docker containers) and `LocalSandboxProvider` (local directory isolation), so developers can pick per risk profile.
+deer-flow provides both `AioSandboxProvider` (Docker container) and `LocalSandboxProvider` (local directory isolation), letting developers choose by risk.
 
-::: Production advice
-**If the Agent runs user-written or downloaded code → container-level sandbox or stronger is required.**  
-**If the Agent only runs on your own codebase → at least same-host separate directory + no `sudo` / `rm -rf /`.**
+::: tip Production advice
+**Agent runs user-written code / code downloaded from the internet → must have container-level sandboxing or higher.**  
+**Agent runs your own codebase → at least different-dir-on-same-host + no `sudo` / `rm -rf /`.**
 :::
 
-## 4. Hooks (Middleware): the Agent's AOP
+## 4. Hooks (Middleware): AOP for Agents
 
-This is standard in helixent / Claude Code. **Insert user code at the Agent's key event points**:
+This is standard in helixent / Claude Code. **Inject user code at key event points in the agent**:
 
 ```
 The 8 hooks Helixent provides:
 
 beforeAgentRun     ─ Agent task starts
   beforeAgentStep  ─ Each step starts
-    beforeModel    ─ Before model call  (mutate prompt, add logging)
-    afterModel     ─ After model call   (evaluate output)
-    beforeToolUse  ─ Before tool call   (approval, arg filtering)
-    afterToolUse   ─ After tool call    (record results)
+    beforeModel    ─ Before model call (modify prompt, add log)
+    afterModel     ─ After model call (evaluate output)
+    beforeToolUse  ─ Before tool call (approval, parameter filter)
+    afterToolUse   ─ After tool call (log result)
   afterAgentStep   ─ Each step ends
-afterAgentRun      ─ Agent task ends    (persist state)
+afterAgentRun      ─ Agent task ends (persist)
 ```
 
 Typical usage:
@@ -172,11 +209,11 @@ def truncate_huge_response(ctx, response):
         response.content = response.content[:50000] + "... [TRUNCATED]"
 ```
 
-Hooks are the key to taking a Harness from a "toy demo" to an "operable product". **No hooks → no logging, no auditing, no dynamic interception.**
+Hooks are the key to moving a harness from "toy demo" to "operable product." **No hooks → no logging, no audit, no dynamic interception.**
 
-## 5. Session Switching: the Key to Long-Running Tasks
+## 5. Session Switching: The Key to Long Runs
 
-**When the task is bigger than one context window**, you must support "shift handover."
+**When the task is bigger than one context window**, you must be able to "hand off."
 
 ```
 Session 1                Session 2                Session 3
@@ -189,17 +226,17 @@ Session 1                Session 2                Session 3
 [context: 95K / 100K]    [context: 92K / 100K]    [context: 88K / 100K]
 ```
 
-Each session start ≈ a new engineer reporting for duty. What lets them get up to speed quickly is **the progress file + git log + project structure conventions**.
+Each session start ≈ a new engineer reporting for duty. What helps them get up to speed is **the progress file + git log + project conventions**.
 
-In *Effective Harnesses for Long-Running Agents*, Anthropic gives a canonical session-start flow (pseudocode):
+In *Effective Harnesses for Long-Running Agents* Anthropic gives a typical session-start pseudocode:
 
 ```
 [Session Start]
 → Run pwd                    (establish working directory)
-→ Read claude-progress.txt   (review previous work)
-→ Read feature_list.json     (identify todos)
+→ Read claude-progress.txt   (review prior work)
+→ Read feature_list.json     (identify outstanding items)
 → Review git log             (understand recent changes)
-→ Execute init.sh            (launch dev environment)
+→ Execute init.sh            (start the dev environment)
 → Run basic end-to-end tests (verify current state)
 → Select highest-priority incomplete feature
 → Implement with continuous testing
@@ -208,20 +245,20 @@ In *Effective Harnesses for Long-Running Agents*, Anthropic gives a canonical se
 [Session End - Clean state maintained]
 ```
 
-Write this flow **into the system prompt** and the Agent inherits "engineer-like working habits." We'll go deeper on this in the next section.
+Write this flow into the system prompt and the agent gains **an engineer's working habits**. We'll dig into this in the next section.
 
-## 6. Memory: the "Long-Term Disk" Across Sessions
+## 6. Memory: The "Long-Term Disk" Across Sessions
 
-Harness-level memory ≠ the in-context memory we discussed in §2.3.
+Harness-level memory ≠ in-context memory from §2.3.
 
 | Context Memory (§2.3) | Harness Memory (here) |
 | :--- | :--- |
-| Lifetime: one session | Cross-session, permanent |
-| Where: inside the context window | Files, SQLite, vector store |
-| Read/written by: the model itself | Hooks + tools + scheduler |
-| Example: a `<summary>` block | `~/.deer-flow/memory/profile.json` |
+| Lifetime: one session | Across sessions, permanent |
+| Lives in: context window | Files, SQLite, vector store |
+| Read/written by: the model | Hooks + tools + scheduler |
+| Example: `<summary>` block | `~/.deer-flow/memory/profile.json` |
 
-deer-flow's memory is a textbook example of the latter:
+deer-flow's memory is the canonical implementation of this kind:
 
 > "DeerFlow remembers across sessions, building a persistent memory of your profile, preferences, and accumulated knowledge."
 
@@ -229,25 +266,25 @@ deer-flow's memory is a textbook example of the latter:
 
 The outermost layer is the **scheduler**:
 
-- Who triggers the task? (user, cron, webhook, IM message)
-- How long until timeout?
-- Does each step need a human approval pause?
-- How does it restart after a crash?
+- Who triggers tasks? (user, cron, webhook, IM message)
+- After how long do tasks timeout?
+- Does each step need to pause for human approval?
+- What if it crashes — how to restart?
 
-Industrial-grade Harnesses (Codex / Claude Code / deer-flow) all have:
+Industrial-grade harnesses (Codex / Claude Code / deer-flow) include:
 
-- **TaskQueue**: long tasks run asynchronously off a queue.
-- **Heartbeat**: regularly reports progress to the user.
-- **Cancel/Resume**: user can stop mid-way or resume later.
-- **Notification**: notify task completion via Slack / Lark, etc.
+- **TaskQueue**: long tasks run async via a queue.
+- **Heartbeat**: regular progress reports to users.
+- **Cancel/Resume**: user can stop / resume mid-flight.
+- **Notification**: notify task completion via Slack / Feishu.
 
-## 8. A Complete Inventory of Harness Components
+## 8. A Complete Component Inventory of a Harness
 
-Pulling it all together into one diagram:
+Pulled together in one diagram:
 
 ```
 ┌──────────────────────────────────────────────────────────────────────┐
-│ Complete Harness Components                                          │
+│ Complete Harness components                                          │
 │                                                                      │
 │  ┌────────────────┐  Tool Loop                                       │
 │  │ Loop Controller│ ←──→ Model API (OpenAI/Anthropic/...)            │
@@ -278,8 +315,8 @@ Pulling it all together into one diagram:
 └──────────────────────────────────────────────────────────────────────┘
 ```
 
-It looks like a lot. **But every component maps to a real problem.** For toy projects you can skip most of them; for production, sooner or later you'll need each one.
+It looks like a lot. **But each component answers a real problem.** A toy project can skip most; a production system will eventually need them all.
 
 ---
 
-Next section: [§3.2 Engineering Long-Running Harnesses →](./02-long-running.md)
+Next: [§3.2 Engineering Long-Running Harnesses →](./02-long-running.md)

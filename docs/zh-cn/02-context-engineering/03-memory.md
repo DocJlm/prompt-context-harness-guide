@@ -110,6 +110,44 @@ def build_memory_block(user_id, current_query):
 
 ✅ **生产级方案**。OpenAI 的 ChatGPT Memory、Anthropic 的 Claude Memory（2025+），底层都是这一类。
 
+### 案例 · deer-flow 的三层 Memory Schema
+
+字节跳动 deer-flow 把这个范式做到了**强制 schema** 级别 —— 而不是给开发者一个空字典让你随便存：
+
+```python
+def create_empty_memory() -> dict[str, Any]:
+    return {
+        "version": "1.0",
+        "lastUpdated": utc_now_iso_z(),
+        "user": {
+            "workContext":     {"summary": "", "updatedAt": ""},
+            "personalContext": {"summary": "", "updatedAt": ""},
+            "topOfMind":       {"summary": "", "updatedAt": ""},
+        },
+        "history": {
+            "recentMonths":      {"summary": "", "updatedAt": ""},
+            "earlierContext":    {"summary": "", "updatedAt": ""},
+            "longTermBackground":{"summary": "", "updatedAt": ""},
+        },
+        "facts": [],
+    }
+```
+— [bytedance/deer-flow `agents/memory/storage.py`](https://github.com/bytedance/deer-flow/blob/main/backend/packages/harness/deerflow/agents/memory/storage.py)
+
+注意三个工程决定：
+
+1. **`workContext` 与 `personalContext` 分离** —— 反映企业 ToB 客户的真实需求：工作记忆不能污染私人偏好。
+2. **`history.{recentMonths, earlierContext, longTermBackground}` 三档时间分层** —— 不是简单按时间排序拉最近 N 条，而是把"最近月份 / 早期 / 长期"分桶。
+3. **写入用原子重命名 + mtime 缓存** ——
+   ```python
+   temp_path = file_path.with_suffix(f".{uuid.uuid4().hex}.tmp")
+   ...
+   temp_path.replace(file_path)  # ← atomic rename
+   ```
+   即便进程崩在写入中途，磁盘上要么是旧版本要么是新版本，**不会半残**。
+
+第 3 章 §3.4 会展开讲 deer-flow 怎么把这个 memory 系统跟 LangGraph 状态机和子 Agent 接起来。
+
 ## 四、Agentic Memory：让 Agent 自己记笔记
 
 Anthropic 在 *Context Engineering* 里浓墨重彩地讲了一个例子——**Claude plays Pokémon**：
